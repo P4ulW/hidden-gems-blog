@@ -13,24 +13,18 @@ Das Hauptproblem der aktuellen Stage _Dark Signal_ ist es, die Positionen der Ge
 
 Na gut, ganz so einfach ist es nicht. Grob zusammengefasst rate ich verschiedenste Edelstein-Positionen, bewerte sie und verbessere sie iterativ. Für einen einzelnen Edelstein im Maze ist das Leben einfach: Man kann einfach per Brute-Force alle Positionen testen und die Auswählen, die am besten zu den gemessenen Signalen passen. Bei einer map von 49x29 sind das 1421 Konfigurationen ("States") die man testen muss. Das geht schnell. Wenn man 2 Gems hat, können es dann schon 2.017.820, das war gerade so machbar ohne wilde Tricks. Bei 3 Gems hört der Spaß leider mit 2.863.286.580 States auf, in 100 ms wird das knapp. Was kann man also machen?
 
-Mathematisch versuchen wir hier ein Inverses Problem zu Lösen (für Menschen die Mathe-Affine sind): Wir haben Messwerte vom einem einen skalaren Felds an verschiedenen Positionen gegeben und versuchen die Quellen (Gems) zu bestimmen. Mathematisch ist das leider nicht ganz trivial. Da ich meinen Bot in C programmiere, will ich ein keinen großen Solver basteln.
+Mathematisch versuchen wir hier ein Inverses Problem zu Lösen (für Menschen die Mathe-Affine sind): Wir haben Messwerte vom einem skalaren Felds an verschiedenen Positionen gegeben und versuchen die Quellen (Gems) zu bestimmen. Mathematisch ist das leider nicht ganz trivial. Da ich meinen Bot in C programmiere, will ich keinen großen Solver basteln.
 
 Vor nicht allzu langer Zeit habe ich ein Paper zum Thema Daten modellieren gelesen ([Paper](https://arxiv.org/abs/1008.4686), kann ich sehr empfehlen. Lösungen als ipynb gibt es hier: [Repo](https://github.com/wdconinc/data-analysis-recipes-fitting-a-model-to-data)) Fitten von Daten zu einem Modell ist ein sehr ähnliches Problem. Der Bot misst das Signal an verschiedenen Orten (unsere Messwerte) und will wissen wo die Gems liegen müssen (Modell). Wir wissen (zum Glück) welchen Effekt die Gems auf das Signal haben. Also versucht auch der Bot das Problem zu lösen, welches Modell die gemessenen Werte produziert. 
 
 ## Monte-Carlo
-Der Metropolis-Hastings-Algorithmus versucht nun genau diese Modell zu bestimmen. Wir wissen, dass zu jedem Zeitpunkt 0-3 Gems im Maze vorhanden sind (0-1 sind trivial, entweder keine Gem oder wir finden ihn mit Brute-Force). Im Fall von zwei Gems können wir folgendes tun: Wir generieren zufällige States, hier zwei Gems die zufällige im Maze verteilt sind. 
-
-Pro zufälligem State läuft es wie folgt ab: 
-1. Wir bestimmen, wie gut der State zu den Messwerten unseres Bots passen. Wir können einfach aus den Gem-Positionen das Signal am Bot berechnen und den
-Fehler zu unseren Messwerten als Metrik verwenden. 
-
-2. Dann mutieren wir den State, z.B. in dem wir einen der Gems leicht verschieben.  
-
-3. Anschließend testen wir erneut, wie gut der leicht mutierte State zu den Messwerten passt. 
-
-4. Ist der neue State besser als der alte nehmen wir ihn an. Ist er schlechter nehmen wir ihn *manchmal* an: Wenn die Fehlerdifferenz $Δe = \| e_{neu} - e_{alt} \| $ ist, dann nehmen wir ihn mit einer Wahrscheinlichkeit von $P = \exp(-Δe/T)$ an. 
+Der Metropolis-Hastings-Algorithmus versucht nun, genau dieses Modell zu bestimmen. Wir wissen, dass zu jedem Zeitpunkt 0–3 Gems im Maze vorhanden sind. Im Fall von zwei Gems gehen wir wie folgt vor: Wir generieren zufällige „States“ – also Positionen für zwei Gems, die zufällig im Maze verteilt sind. Pro State läuft der Prozess iterativ ab:
+- **Bewerten**: Wir berechnen, wie gut der State zu den Messwerten passt. Wir simulieren das Signal, das diese Edelstein-Positionen erzeugen würden, und nutzen die Abweichung (Fehler) zu den echten Messwerten als Metrik.
+- **Mutieren**: Wir verändern den State leicht, indem wir einen der Gems ein Stück verschieben. Vergleichen: Wir prüfen den Fehler des mutierten States. 
+- **Entscheiden**: Ist der neue State besser, akzeptieren wir ihn. Ist er schlechter, nehmen wir ihn nur manchmal an: Bei einer Fehlerdifferenz von $\Delta e = e_{neu} - e_{alt}$ liegt die Wahrscheinlichkeit bei $P = \exp(-\Delta e/T)$.
 
 `T` ist dabei ein Parameter der Temperatur genannt wird (wegen Boltzmann-Gesetz). Je größer `T`, desto wahrscheinlicher wird der neue State angenommen, sodass der Parameterraum aggressiver abgesucht wird. Es ist wichtig, manchmal 'schlechtere' States zu besuchen, um nicht in lokalen Minima steckenzubleiben. Man kann sich das so vorstellen, dass der State durch den Parameterraum läuft und das Optimum sucht. Einen solchen Prozess nennt man auch Markov-Chain. Somit handelt es sich hier um eine Markov-Chain Monte-Carlo Methode.  
+
 <details>
 <summary>Mehr zu: Markov-Chain</summary>
     Eine Markov-Chain ist eine Prozess, in dem die Wahrscheinlichkeit, welcher Zustand als nächstes besucht wird, nur vom aktuellen Zustand abhängt. Der Prozess hat in diesem Sinne kein 'Gedächtnis'. Ein einfaches Beispiel dazu wäre ein sogenannten _Random Walk_: Unser Walker startet bei der Position $x=0$. Von da aus hat er eine Wahrscheinlichkeit von $P=0.5$ nach rechts zu auf $x=1$ zu gehen und eine Wahrscheinlichkeit von $P=0.5$ nach links zu $x=-1$ zu gehen. Nachdem er einen Schritt getan hat, sind seine Wahrscheinlichkeiten erneut sie 50/50 links oder rechts zu gehen. Sie hängen nicht davon ab, was in der Vergangenheit passiert ist, wichtig ist nur, an welcher Position er sich momentan befindet.
@@ -172,5 +166,24 @@ Hier eine kleine Visualisierung (braucht JavaScript):
 })();
 </script>
 
+<details>
+<summary style="color: #555">Details zur Simulation: Was passiert hier?</summary>
+<div>
+    <p>Hier sieht man das Ensemble-MCMC in Action:</p>
+    <ul style="padding-left: 20px;">
+        <li><strong>Setup:</strong> Die <strong>roten Punkte</strong> sind die tatsächlichen Gem-Positionen (die "Wahrheit"). Die <strong>türkisen Quadrate</strong> markieren den Pfad des Bots, also unsere Messpunkte für das Signal.</li>
+        <li><strong>Walker-Ensemble:</strong> Die blauen Kreise sind die 100 Walker. Jeder startet mit einer zufälligen Konfiguration aus zwei Gems und versucht, das gemessene Signal bestmöglich zu reproduzieren.</li>
+        <li><strong>Der Algorithmus:</strong> In jedem Schritt mutieren die Walker ihre Position. Über das Metropolis-Kriterium wird entschieden, ob der neue State akzeptiert wird. Das Ziel ist es, den <strong>Best SSE</strong> (den quadratischen Fehler) zu minimieren.</li>
+        <li><strong>Temperatur-Regler:</strong> 
+            <ul style="margin-top: 5px;">
+                <li>Eine hohe <strong>Temp</strong> lässt die Walker den gesamten Parameterraum aggressiver absuchen, um lokale Minima zu vermeiden.</li>
+                <li>Niedrige Werte sorgen dafür, dass sie sich eng um das globale Optimum konzentrieren.</li>
+            </ul>
+        </li>
+        <li><strong>Konvergenz:</strong> Nach dem Start sieht man, wie die Walker aus der anfänglichen Zufallsverteilung heraus die Gems finden und stabil auf den Zielpositionen bleiben.</li>
+    </ul>
+</div>
+</details>
+
 ## Fazit
-Aktuell verwende ich 200 Walker mit jeweils 500 Iterationen pro möglicher Gem Zahl. Ich finde damit meist in 3-5 Messwerten/Moves die tatsächlichen Edelstein-Positionen. Klingt recht gut, keine Ahnung wie sich das mit anderen Methoden vergleicht. Mit ein paar Optimierungen und hab ich eine average response time des Bots von ca. 15 ms.
+Aktuell verwende ich 200 Walker mit jeweils 500 Iterationen pro möglicher Gem Zahl. Ich finde damit meist in 3-5 Messwerten/Moves die tatsächlichen Edelstein-Positionen. Klingt recht gut, keine Ahnung wie sich das mit anderen Methoden vergleicht. Mit ein paar Optimierungen am Code habe ich eine average response time des Bots von ca. 15 ms. In den letzten Scrims hat sich auch gezeigt, dass nur das finden der Gems alleine noch nicht ausreicht, um Top Scores zu erziehlen. Also heißt es: weiterbasteln!
