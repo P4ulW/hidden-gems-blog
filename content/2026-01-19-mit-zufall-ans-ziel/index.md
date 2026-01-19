@@ -21,16 +21,21 @@ Vor nicht allzu langer Zeit habe ich ein Paper zum Thema Daten modellieren geles
 Der Metropolis-Hastings-Algorithmus versucht nun genau diese Modell zu bestimmen. Wir wissen, dass zu jedem Zeitpunkt 0-3 Gems im Maze vorhanden sind (0-1 sind trivial, entweder keine Gem oder wir finden ihn mit Brute-Force). Im Fall von zwei Gems können wir folgendes tun: Wir generieren zufällige States, hier zwei Gems die zufällige im Maze verteilt sind. 
 
 Pro zufälligem State läuft es wie folgt ab: 
-1. Wir bestimmen, wie gut der State zu dem Messwerten unseres Bots passen. Wir können einfach aus den Gem-Positionen das Signal am Bot berechnen und den
+1. Wir bestimmen, wie gut der State zu den Messwerten unseres Bots passen. Wir können einfach aus den Gem-Positionen das Signal am Bot berechnen und den
 Fehler zu unseren Messwerten als Metrik verwenden. 
 
 2. Dann mutieren wir den State, z.B. in dem wir einen der Gems leicht verschieben.  
 
 3. Anschließend testen wir erneut, wie gut der leicht mutierte State zu den Messwerten passt. 
 
-4. Ist der neue State besser als der alte nehmen wir ihn an. Ist er schlechter nehmen wir ihn *manchmal* an: Wenn die Fehlerdifferenz `Δe = e_neu - e_alt` ist, dann nehmen wir ihn mit einer Wahrscheinlichkeit von `P = exp(-Δe/T)` an. 
+4. Ist der neue State besser als der alte nehmen wir ihn an. Ist er schlechter nehmen wir ihn *manchmal* an: Wenn die Fehlerdifferenz $Δe = \| e_{neu} - e_{alt} \| $ ist, dann nehmen wir ihn mit einer Wahrscheinlichkeit von $P = \exp(-Δe/T)$ an. 
 
-`T` ist dabei ein Parameter der Temperatur genannt wird (wahrscheinlich wegen Boltzmann-Gesetz). Je größer `T`, desto wahrscheinlicher wird der neue State angenommen, sodass der Parameterraum aggressiver abgesucht wird. Es ist wichtig, manchmal 'schlechtere' States zu besuchen, um nicht in lokalen Minima steckenzubleiben. Man kann sich das so vorstellen, das der State durch den Parameterraum läuft und das Optimum sucht. Einen solchen Prozess nennt man auch Markov Chain. Somit handelt es sich hier um eine Markov-Chain Monte-Carlo Methode.  
+`T` ist dabei ein Parameter der Temperatur genannt wird (wegen Boltzmann-Gesetz). Je größer `T`, desto wahrscheinlicher wird der neue State angenommen, sodass der Parameterraum aggressiver abgesucht wird. Es ist wichtig, manchmal 'schlechtere' States zu besuchen, um nicht in lokalen Minima steckenzubleiben. Man kann sich das so vorstellen, dass der State durch den Parameterraum läuft und das Optimum sucht. Einen solchen Prozess nennt man auch Markov-Chain. Somit handelt es sich hier um eine Markov-Chain Monte-Carlo Methode.  
+<details>
+<summary>Mehr zu: Markov-Chain</summary>
+    Eine Markov-Chain ist eine Prozess, in dem die Wahrscheinlichkeit, welcher Zustand als nächstes besucht wird, nur vom aktuellen Zustand abhängt. Der Prozess hat in diesem Sinne kein 'Gedächtnis'. Ein einfaches Beispiel dazu wäre ein sogenannten _Random Walk_: Unser Walker startet bei der Position $x=0$. Von da aus hat er eine Wahrscheinlichkeit von $P=0.5$ nach rechts zu auf $x=1$ zu gehen und eine Wahrscheinlichkeit von $P=0.5$ nach links zu $x=-1$ zu gehen. Nachdem er einen Schritt getan hat, sind seine Wahrscheinlichkeiten erneut sie 50/50 links oder rechts zu gehen. Sie hängen nicht davon ab, was in der Vergangenheit passiert ist, wichtig ist nur, an welcher Position er sich momentan befindet.
+</details>
+<p></p>
 
 Dieses Prozedere machen wir nicht nur mit einem State, sondern mit vielen sogenannten *Walkern*. In der Regel: Je mehr States, desto genauer das Resultat. Außerdem, je länger die Kette an besuchten States, desto besser approximiert sie die tatsächliche Lösung. Dieses Ensemble an Walkern macht der Algorithmus sehr stabil gegen Fehler und lokale Minima.
 
@@ -39,8 +44,8 @@ Da das Signal kein Noise oder ähnliches hat können wir einfach am Ende den Sta
 ## Simulation
 Hier eine kleine Visualisierung (braucht JavaScript):
 
-<div style="color:#2ff; padding:15px; border:1px solid #333; max-width:600px; margin:auto; border-radius:8px; font-family: monospace; background:#111;">
-    <div style="border-bottom:1px solid #333; padding-bottom:8px; margin-bottom:10px; font-size:12px; display:flex; justify-content:space-between;">
+<div style="color:#2ff; padding:15px; border:1px solid #222; max-width:800px; margin:auto; border-radius:10px; background:#111;">
+    <div style="border-bottom:1px solid #333; padding-bottom:8px; margin-bottom:10px; display:flex; justify-content:space-between;">
         <span>> ENSEMBLE_MCMC</span>
         <span style="color:#888;">Temp: <span id="tVal" style="color:#abf;">0.20</span></span>
     </div>
@@ -50,7 +55,7 @@ Hier eine kleine Visualisierung (braucht JavaScript):
             <label style="font-size:11px; color:#aaa; white-space:nowrap;">ADJUST TEMP:</label>
             <input type="range" id="tempSlider" min="0.01" max="2.0" step="0.01" value="0.2" style="flex-grow:1; cursor:pointer; accent-color:#abf;">
         </div>
-        <div style="display:flex; justify-content:space-between; align-items: center; font-size:11px;">
+        <div style="display:flex; justify-content:space-between; align-items: center;">
             <div>
                 <span style="color:#2ff">■</span> Path | <span style="color:#55f">○</span> Ensemble
             </div>
@@ -112,7 +117,7 @@ Hier eine kleine Visualisierung (braucht JavaScript):
     }
 
     function draw() {
-        ctx.fillStyle = 'rgba(0,0,0,1)'; ctx.fillRect(0,0,W,H);
+        ctx.fillStyle = '#222'; ctx.fillRect(0,0,W,H);
         ctx.fillStyle = '#2ff'; botHistory.forEach(p => ctx.fillRect(p.x-3, p.y-3, 6, 6));
         ctx.fillStyle = '#f44'; trueGems.forEach(g => { ctx.beginPath(); ctx.arc(g.x, g.y, 6, 0, 7); ctx.fill(); });
         ensemble.forEach(w => {
@@ -129,7 +134,7 @@ Hier eine kleine Visualisierung (braucht JavaScript):
         tOut.innerText = currentTemp.toFixed(2);
 
         ensemble.forEach(w => {
-            for(var i=0; i<5; i++) {
+            for(var i=0; i<10; i++) {
                 var eC = getSSE(w);
                 var step = 25;
                 var nS = {
